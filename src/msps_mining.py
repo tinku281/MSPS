@@ -107,12 +107,19 @@ def prefix_span(prefix, prefix_length , item_sequences, base_item, mis_count):
   
   print projected_db
   
+  # Remove the sequences that do not contain the base item if the prefix does not contain the base item
   if not has_item(prefix, base_item):
     projected_db = [projected_sequence for projected_sequence in projected_db if has_item(projected_sequence, base_item)]
         
   print projected_db
+  
+  # Remove sequences that do not satisfy SDC
   sdc_filter(projected_db)
-
+  
+  # Find the prefix_length + 1 sequential patterns 
+  if len(projected_db) >= mis_count:    # Check if the projected database has atleast count(MIS(base_item)) sequences
+     
+  
 
 def sdc_filter(source_list):
   s =1
