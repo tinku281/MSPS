@@ -29,22 +29,22 @@ def main():
   output_patterns = []    # To hold the output frequent sequential patterns
   
   # Read the data file
-  file = open(args[1], 'rU')
-  text = file.read();
-  file.close()
+  in_file = open(args[1], 'rU')
+  text = in_file.read();
+  in_file.close()
   
-  # Parse the data file to create nested list of data sequences
+  # Parse the data in_file to create nested list of data sequences
   text = text.replace('<{', '').replace('}>', '')
   sequences = text.split("\n")
   sequences = [ sequence.split("}{") for sequence in sequences if sequence]
   sequences = [[[item.strip() for item in itemset.split(",")] for itemset in sequence] for sequence in sequences]
 
   # Read the support file
-  file = open(args[3], 'rU')
-  text = file.read()
-  file.close()
+  in_file = open(args[3], 'rU')
+  text = in_file.read()
+  in_file.close()
   
-  # Parse the support file to create support dict and retrieve support difference constraint
+  # Parse the support in_file to create support dict and retrieve support difference constraint
   mis_values = { match[0]: float(match[1]) for match in re.findall(r'MIS\((\w+)\)\s+=\s+(\d*\.?\d*)', text) }
   sdc = float(re.search(r'SDC\s=\s(\d*\.?\d*)', text).group(1))
   
@@ -99,17 +99,40 @@ def begin_msps(sequences, mis_values, sdc):
     sequences = remove_item(sequences, item)
     
   # End of the mining algorithm, print output
-  print output_patterns
-    
+  write_output(output_patterns)
 
-def length(source_list):
-  if source_list:
-    while isinstance(source_list[0], list):
-      source_list = list(itertools.chain(*source_list))
-    
-    return len(set(source_list))
 
-  return 0
+def write_output(output_list):
+  output_list = sorted(output_list,key=pattern_length)
+  output_text = ''
+  
+  cur_length = 1
+  
+  while True:
+    cur_length_patterns = filter (lambda a: pattern_length(a) == cur_length, output_list)
+    if not cur_length_patterns:
+      break
+    
+    output_text += "The number of length " + str(cur_length) + " sequential patterns is " + str(len(cur_length_patterns)) + "\n"
+    
+    for (pattern,sup_count) in cur_length_patterns:
+      str_pattern = "<{" + "}{".join([item for itemset in pattern for item in itemset]) + "}>"
+      output_text += "Pattern: " + str_pattern + " Count: " + str(sup_count) + "\n"
+    
+    cur_length += 1
+    
+    output_text += "\n"
+  
+  print output_text
+    
+      
+def pattern_length(output_tuple):
+  output_list = output_tuple[0]
+  
+  while isinstance(output_list[0], list):
+    output_list = list(itertools.chain(*output_list))
+  
+  return len(output_list)
 
 
 def remove_item(source_list, item_to_del):
@@ -165,7 +188,7 @@ def r_prefix_span(base_item, item_sequences, mis_count):
   
   # Add the base_item 1-length sequential pattern to the output database
   if has_item(len_1_freq_sequences, base_item):
-    output_patterns.append([[base_item]])
+    output_patterns.append(([[base_item]], support_count(item_sequences, base_item)))
       
   for freq_sequence in len_1_freq_sequences:
     prefix_span(freq_sequence, item_sequences, base_item, mis_count)
@@ -225,17 +248,17 @@ def prefix_span(prefix, item_sequences, base_item, mis_count):
     
     for item, sup_count in dict_template_1.iteritems():
       if sup_count >= mis_count:
-        sequential_patterns.append(prefix[:-1] + [prefix[-1] + [item]])
+        sequential_patterns.append((prefix[:-1] + [prefix[-1] + [item]], sup_count))
     
     for item, sup_count in dict_template_2.iteritems():
       if sup_count >= mis_count:
-        sequential_patterns.append(prefix + [[item]])
+        sequential_patterns.append((prefix + [[item]], sup_count))
     
 #    print "SQ Patterns:@@"
 #    print sequential_patterns  
         
-    for seq_pattern in sequential_patterns:
-      output_patterns.append(seq_pattern)
+    for (seq_pattern, sup_count) in sequential_patterns:
+      output_patterns.append((seq_pattern, sup_count))
       prefix_span(seq_pattern, item_sequences, base_item, mis_count)
       
     
@@ -286,6 +309,13 @@ def project_sequence(prefix_last_item, suffix):
       suffix_first_itemset = ['_'] + suffix_first_itemset[suffix_first_itemset.index(prefix_last_item)+1:]
       return suffix
   
+
+def support_count(sequences, req_item):
+  flattened_sequences = [ list(set(itertools.chain(*sequence))) for sequence in sequences ]
+  support_counts = dict(Counter(item for flattened_sequence in flattened_sequences for item in flattened_sequence))
+  
+  return support_counts.get(req_item)
+
   
 def contains(big, small):
   return len(set(big).intersection(set(small))) == len(small)
