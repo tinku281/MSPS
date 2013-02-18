@@ -77,7 +77,6 @@ def begin_msps(sequences, mis_values, sdc):
   
   # Get the sorted list of frequent items i.e items with sup(i) >= MIS(i)
   frequent_items = sorted([item for item in actual_supports.keys() if actual_supports.get(item) >= mis_values.get(item)],key=mis_values.get)
-  
 #  print flattened_sequences 
 #  print frequent_items
 
@@ -176,9 +175,6 @@ def sdc_filter_on_item(source_list, base_item, base_item_support, supports, sdc)
 
 
 def r_prefix_span(base_item, item_sequences, mis_count):
-  # Remove the infrequent items from the sequence database
-#  item_sequences = remove_infrequent_items(item_sequences, mis_count)
-  
   # Get the frequent items and construct length one frequent sequences from them
   freq_item_sequences = remove_infrequent_items(item_sequences, mis_count)
   frequent_items = list(set(itertools.chain(*(itertools.chain(*freq_item_sequences)))))
@@ -196,8 +192,6 @@ def r_prefix_span(base_item, item_sequences, mis_count):
   
 
 def prefix_span(prefix, item_sequences, base_item, mis_count):
-#  print "Prefix:",prefix
-      
   # Compute the projected database for the current prefix
   projected_db = compute_projected_database(prefix, item_sequences, base_item, mis_count)
 #  print "DB:", projected_db
@@ -249,11 +243,15 @@ def prefix_span(prefix, item_sequences, base_item, mis_count):
     
     for item, sup_count in dict_template_1.iteritems():
       if sup_count >= mis_count:
-        sequential_patterns.append((prefix[:-1] + [prefix[-1] + [item]], sup_count))
+        pattern = prefix[:-1] + [prefix[-1] + [item]]
+        if has_item(pattern, base_item):
+          sequential_patterns.append((pattern, sup_count))
     
     for item, sup_count in dict_template_2.iteritems():
       if sup_count >= mis_count:
-        sequential_patterns.append((prefix + [[item]], sup_count))
+        pattern = prefix + [[item]]
+        if has_item(pattern, base_item):
+          sequential_patterns.append((pattern, sup_count))
     
 #    print "SQ Patterns:@@"
 #    print sequential_patterns  
@@ -282,9 +280,7 @@ def compute_projected_database(prefix, item_sequences, base_item, mis_count):
       if projected_sequence:
         projected_db.append(projected_sequence)
   
-  # Remove the sequences that do not contain the base item if the prefix does not contain the base item
-    if not has_item(prefix, base_item):
-      projected_db = [projected_sequence for projected_sequence in projected_db if projected_sequence and has_item(projected_sequence, base_item)]
+  projected_db
   
   # Remove the infrequent items
   projected_db = remove_infrequent_items(projected_db, mis_count)
@@ -307,7 +303,7 @@ def project_sequence(prefix_last_item, suffix):
     if prefix_last_item == suffix_first_itemset[-1]:
       return suffix[1:]
     else:
-      suffix_first_itemset = ['_'] + suffix_first_itemset[suffix_first_itemset.index(prefix_last_item)+1:]
+      suffix[0] = ['_'] + suffix_first_itemset[suffix_first_itemset.index(prefix_last_item)+1:]
       return suffix
   
 
@@ -345,8 +341,9 @@ def is_sdc_satisfied(itemset):
   for item1 in itemset:
     sup_item1 = actual_supports.get(item1)
     for item2 in itemset:
-      if abs(sup_item1 - actual_supports.get(item2)) > sdc:
-        return False
+      if not item1 == '_' and not item2 == '_':
+        if abs(sup_item1 - actual_supports.get(item2)) > sdc:
+          return False
       
   return True
 
@@ -358,8 +355,9 @@ def is_sequence_sdc_satisfied(sequence):
   for item1 in sequence:
     sup_item1 = actual_supports.get(item1)
     for item2 in sequence:
-      if abs(sup_item1 - actual_supports.get(item2)) > sdc:
-        return False
+      if not item1 == '_' and not item2 == '_':
+        if abs(sup_item1 - actual_supports.get(item2)) > sdc:
+          return False
       
   return True        
         
