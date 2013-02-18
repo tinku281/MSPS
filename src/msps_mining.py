@@ -25,7 +25,7 @@ def main():
     _exit()
     
   # Define global variables
-  global output_patterns
+  global output_patterns, sdc
   output_patterns = []    # To hold the output frequent sequential patterns
   
   # Read the data file
@@ -69,6 +69,7 @@ def begin_msps(sequences, mis_values, sdc):
   sequence_count = len(sequences)
   
   # Get the item support for each item i.e. sup(i)
+  global actual_supports
   flattened_sequences = [ list(set(itertools.chain(*sequence))) for sequence in sequences ]
   support_counts = dict(Counter(item for flattened_sequence in flattened_sequences for item in flattened_sequence)) 
   actual_supports = {item:support_counts.get(item)/float(sequence_count) for item in support_counts.keys()}
@@ -76,17 +77,13 @@ def begin_msps(sequences, mis_values, sdc):
   
   # Get the sorted list of frequent items i.e items with sup(i) >= MIS(i)
   frequent_items = sorted([item for item in actual_supports.keys() if actual_supports.get(item) >= mis_values.get(item)],key=mis_values.get)
-  
-#  print flattened_sequences 
-#  print frequent_items
-
 
   # Iterate through frequent items to get sequential patterns
   for item in frequent_items:
     # Get the minimum item support count for item i.e count(MIS(item))
     mis_count = int(math.ceil(mis_values.get(item)*len(sequences)))
     
-#    print "Current item:",item,'-----------------------------------------------',"MIS:",mis_count, "Sup:",support_counts.get(item)
+#    print "------------- Current item:",item,"MIS:",mis_count, "Sup:",support_counts.get(item),"-----------------"
        
     # Get the sequences containing that item and filter them to remove elements that do not satisfy SDC i.e. |sup(j) - sup(item)| > sdc
     item_sequences = [sdc_filter_on_item(sequence, item, actual_supports.get(item), actual_supports, sdc) for sequence in sequences if has_item(sequence, item)]
@@ -103,23 +100,26 @@ def begin_msps(sequences, mis_values, sdc):
 
 
 def write_output(output_list):
-  output_list = sorted(output_list,key=pattern_length)
-  output_text = ''
+  output_list = sorted(output_list,key=pattern_length)    # Sort the output based on pattern length
+  output_text = ''    # Intialize empty string to append the output text
   
-  cur_length = 1
+  cur_length = 1    # Initialize current length as 1 
   
-  while True:
+  while True:   # Iterate until there are no patterns of specified length
+    # Get all the patterns of current length from output 
     cur_length_patterns = filter (lambda a: pattern_length(a) == cur_length, output_list)
-    if not cur_length_patterns:
+    if not cur_length_patterns:   # Break from the loop if the list is empty 
       break
     
+    # Print the current length and number of patterns for current length
     output_text += "The number of length " + str(cur_length) + " sequential patterns is " + str(len(cur_length_patterns)) + "\n"
     
+    # Print all the patterns with their support counts
     for (pattern,sup_count) in cur_length_patterns:
       str_pattern = "<{" + "}{".join([",".join(itemset) for itemset in pattern]) + "}>"
       output_text += "Pattern: " + str_pattern + " Count: " + str(sup_count) + "\n"
     
-    cur_length += 1
+    cur_length += 1   # Increment the current length 
     
     output_text += "\n"
   
@@ -127,12 +127,12 @@ def write_output(output_list):
     
       
 def pattern_length(output_tuple):
-  output_list = output_tuple[0]
+  seq_pattern = output_tuple[0]   # Get the sequential pattern
   
-  while isinstance(output_list[0], list):
-    output_list = list(itertools.chain(*output_list))
+  while isinstance(seq_pattern[0], list):   # Chain it until all sub-lists are removed
+    seq_pattern = list(itertools.chain(*seq_pattern))
   
-  return len(output_list)
+  return len(seq_pattern)   # Return the length of the pattern
 
 
 def remove_item(source_list, item_to_del):
@@ -153,20 +153,20 @@ def remove_item(source_list, item_to_del):
   return filtered_list    # Return the filtered list from current recursion
   
   
-def sdc_filter_on_item(source_list, base_item, base_item_support, supports, sdc):
+def sdc_filter_on_item(source_list, base_item, base_item_support, supports, sd_constraint):
   filtered_list = []    # Declare list to contain filter results
   
   # Check to see if list has sub lists as items    
   if source_list and isinstance(source_list[0], list):
     for child_list in source_list:
-      filtered_child_list = sdc_filter_on_item(child_list, base_item, base_item_support, supports, sdc)    # Recurse for filtering each child_list
+      filtered_child_list = sdc_filter_on_item(child_list, base_item, base_item_support, supports, sd_constraint)    # Recurse for filtering each child_list
       if filtered_child_list:   # Append only the non-empty lists
         filtered_list.append(filtered_child_list)  
     
   else:   # Remove items that do not satisfy support difference constraint
     for item in source_list:
 #      print "Item:",item,"Support:",item_supports.get(item),"Diff:",abs(item_supports.get(item) - base_item_support)
-      if not item == base_item and abs(supports.get(item) - base_item_support) > sdc:  # Item doesn't satisfy SDC
+      if not item == base_item and abs(supports.get(item) - base_item_support) > sd_constraint:  # Item doesn't satisfy SDC
         continue
       else:   # Item satisfies SDC
         filtered_list.append(item)
@@ -189,7 +189,8 @@ def r_prefix_span(base_item, item_sequences, mis_count):
   # Add the base_item 1-length sequential pattern to the output database
   if has_item(len_1_freq_sequences, base_item):
     output_patterns.append(([[base_item]], support_count(item_sequences, base_item)))
-      
+  
+  # Run Prefix Span for each length-1 frequent sequential pattern    
   for freq_sequence in len_1_freq_sequences:
     prefix_span(freq_sequence, item_sequences, base_item, mis_count)
   
@@ -203,82 +204,82 @@ def prefix_span(prefix, item_sequences, base_item, mis_count):
   
   # Find the prefix_length + 1 sequential patterns 
   if projected_db:    # Check if the projected database has any sequences
-    prefix_last_itemset = prefix[-1]
-    all_template_1_items = []
-    all_template_2_items = []
+    
+    # Initialize local variables
+    prefix_last_itemset = prefix[-1]    # Last itemset in prefix
+    all_template_1_items = []   # To hold all items for template 1 match i.e {30, x} or {_, x}
+    all_template_2_items = []   # To hold all items for template 2 match i.e {30}{x}
     
     for proj_sequence in projected_db:
       itemset_index = 0
-      template_1_items = []
-      template_2_items = []
+      template_1_items = []   # To hold items for template 1 match from current sequence
+      template_2_items = []   # To hold items for template 2 match from current sequence
       
-      while itemset_index < len(proj_sequence):
-        cur_itemset = proj_sequence[itemset_index]
+      while itemset_index < len(proj_sequence):   # Iterate through itemsets in sequence
+        cur_itemset = proj_sequence[itemset_index]    # Current itemset in sequence
         
-        if has_item(cur_itemset, '_'):
+        if has_item(cur_itemset, '_'):    # Add the items following '_' to template 1 list if it's a {_, x} match
           template_1_items += cur_itemset[1:]
         
+        # Itemset doesn't contain '_', check for other matches
         else:
-          if contains(cur_itemset, prefix_last_itemset):
-            template_1_items += cur_itemset[cur_itemset.index(prefix_last_itemset[-1])+1:]
+          if contains(cur_itemset, prefix_last_itemset):    # Check if current itemset contains last itemset of prefix i.e {30, x} match
+            template_1_items += cur_itemset[cur_itemset.index(prefix_last_itemset[-1])+1:]    # Add the items following prefix's last itemset's last item from the current itemset 
           
-          template_2_items += cur_itemset  
+          template_2_items += cur_itemset  # Add all the items in current itemset to template 2 list i.e {30}{x} match
         
         itemset_index += 1
       
-#      print "T 1 items:@@",  
-#      print template_1_items
-#        
-#      print "T 2 items:@@",
-#      print template_2_items 
-      
-      all_template_1_items += list(set(template_1_items))
+      # Add only the unique elements from both lists of current sequence to the main lists as each element is considered only once for a sequence
+      all_template_1_items += list(set(template_1_items))   
       all_template_2_items += list(set(template_2_items))
-      
+    
+    # Compute the total occurences of each element for each template i.e number of sequences it satisfied for a template match
     dict_template_1 = dict(Counter(item for item in all_template_1_items))
     dict_template_2 = dict(Counter(item for item in all_template_2_items))
     
-#    print "T 1 items:@@",  
-#    print dict_template_1
-#    
-#    print "T 2 items:@@",
-#    print dict_template_2 
+#    print "Template 1 items:", dict_template_1
+#    print "Template 2 items:", dict_template_2 
     
-    sequential_patterns = []
+    freq_sequential_patterns = []  # Initialize empty list to contain obtained sequential patterns
     
+    # For both the template matches, generate freuqent sequential patterns i.e patterns having support count >= MIS count
     for item, sup_count in dict_template_1.iteritems():
       if sup_count >= mis_count:
-        sequential_patterns.append((prefix[:-1] + [prefix[-1] + [item]], sup_count))
+        # Add the item to the last itemset of prefix for obtaining the pattern
+        freq_sequential_patterns.append((prefix[:-1] + [prefix[-1] + [item]], sup_count))    # Add the pattern with its support count to frequent patterns list
     
     for item, sup_count in dict_template_2.iteritems():
       if sup_count >= mis_count:
-        sequential_patterns.append((prefix + [[item]], sup_count))
+        # Append the item contained in a new itemset to the prefix
+        freq_sequential_patterns.append((prefix + [[item]], sup_count))    # Add the pattern with its support count to frequent patterns list
     
-#    print "SQ Patterns:@@"
-#    print sequential_patterns  
+#    print "Frequent Sequential Patterns:", freq_sequential_patterns  
         
-    for (seq_pattern, sup_count) in sequential_patterns:
-      output_patterns.append((seq_pattern, sup_count))
-      prefix_span(seq_pattern, item_sequences, base_item, mis_count)
+    for (seq_pattern, sup_count) in freq_sequential_patterns:   # Iterate through patterns obtained
+      output_patterns.append((seq_pattern, sup_count))    # Add the pattern to the output list
+      prefix_span(seq_pattern, item_sequences, base_item, mis_count)  # Call prefix_span recursively with the pattern as prefix
       
     
 def compute_projected_database(prefix, item_sequences, base_item, mis_count):
   projected_db = []
   
+  # Populate the projected database with projected sequences
   for sequence in item_sequences:
     cur_pr_itemset = 0
     cur_sq_itemset = 0
     
     while cur_pr_itemset < len(prefix) and cur_sq_itemset < len(sequence):
-      if contains(sequence[cur_sq_itemset], prefix[cur_pr_itemset]):
+      if contains(sequence[cur_sq_itemset], prefix[cur_pr_itemset]):    # Sequence itemset contains the prefix itemset, move to next prefix itemset
         cur_pr_itemset += 1
-        if cur_pr_itemset == len(prefix): break
+        if cur_pr_itemset == len(prefix): break   # All prefix itemsets are present in the sequence
       
-      cur_sq_itemset += 1
+      cur_sq_itemset += 1   # Move to next sequence itemset
     
-    if cur_pr_itemset == len(prefix):
-      projected_sequence = project_sequence(prefix[-1][-1], sequence[cur_sq_itemset:])
-      if projected_sequence:
+    if cur_pr_itemset == len(prefix):   # Prefix was present in the current sequence
+      projected_sequence = project_sequence(prefix[-1][-1], sequence[cur_sq_itemset:])  # Get the projected sequence
+      
+      if projected_sequence:    # Non-empty sequence, add to projected database
         projected_db.append(projected_sequence)
   
   # Remove the sequences that do not contain the base item if the prefix does not contain the base item
@@ -291,22 +292,22 @@ def compute_projected_database(prefix, item_sequences, base_item, mis_count):
   # Check if any frequent items are left
   validation_db = remove_empty_elements([[[item for item in itemset if not item == '_'] for itemset in sequence] for sequence in projected_db])
   
-  if validation_db:
-    # Remove sequences that do not satisfy SDC
-    projected_db = sdc_filter(projected_db)
-    
-    return remove_empty_elements(projected_db)
+  if validation_db:   # Non-empty database
+    projected_db = sdc_filter(projected_db)  # Remove sequences that do not satisfy SDC
+    return remove_empty_elements(projected_db)    # Remove empty elements and return the projected database
   
-  else:
+  else:   # Empty database
     return validation_db
     
     
 def project_sequence(prefix_last_item, suffix):
     suffix_first_itemset = suffix[0]
-    if prefix_last_item == suffix_first_itemset[-1]:
+        
+    if prefix_last_item == suffix_first_itemset[-1]:    # Template 2 projection, return suffix - current_itemset 
       return suffix[1:]
-    else:
-      suffix_first_itemset = ['_'] + suffix_first_itemset[suffix_first_itemset.index(prefix_last_item)+1:]
+    
+    else:   # Template 1 projection, remove items from first itemset of suffix that are before the index of prefix's last item and put '_' as first element
+      suffix_first_itemset = ['_'] + suffix_first_itemset[suffix_first_itemset.index(prefix_last_item)+1:]    
       return suffix
   
 
@@ -330,8 +331,8 @@ def has_item(source_list, item):
   return False
 
 
-def sdc_filter(source_list):
-  return source_list
+def sdc_filter(projected_database):
+  return projected_database
 
 
 def remove_infrequent_items(item_sequences, min_support_count):
