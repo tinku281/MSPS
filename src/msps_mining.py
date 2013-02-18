@@ -332,8 +332,36 @@ def has_item(source_list, item):
 
 
 def sdc_filter(projected_database):
-  return projected_database
+  filtered_database = [[itemset for itemset in sequence if is_sdc_satisfied(itemset)] for sequence in projected_database]
+#  flattened_sequences = [ list(set(itertools.chain(*sequence))) for sequence in projected_database ]
+#  filtered_database = [sequence for i,sequence in enumerate(projected_database) if is_sequence_sdc_satisfied(flattened_sequences[i])]  
+  return filtered_database
 
+def is_sdc_satisfied(itemset):
+  if not itemset:
+    return False
+  
+  for item1 in itemset:
+    sup_item1 = actual_supports.get(item1)
+    for item2 in itemset:
+      if abs(sup_item1 - actual_supports.get(item2)) > sdc:
+        return False
+      
+  return True
+
+
+def is_sequence_sdc_satisfied(sequence):
+  if not sequence:
+    return False
+  
+  for item1 in sequence:
+    sup_item1 = actual_supports.get(item1)
+    for item2 in sequence:
+      if abs(sup_item1 - actual_supports.get(item2)) > sdc:
+        return False
+      
+  return True        
+        
 
 def remove_infrequent_items(item_sequences, min_support_count):
   # Get the support count for each item in supplied sequence database
