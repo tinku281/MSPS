@@ -117,7 +117,7 @@ def write_output(output_list):
     output_text += "The number of length " + str(cur_length) + " sequential patterns is " + str(len(cur_length_patterns)) + "\n"
     
     for (pattern,sup_count) in cur_length_patterns:
-      str_pattern = "<{" + "}{".join([item for itemset in pattern for item in itemset]) + "}>"
+      str_pattern = "<{" + "}{".join([",".join(itemset) for itemset in pattern]) + "}>"
       output_text += "Pattern: " + str_pattern + " Count: " + str(sup_count) + "\n"
     
     cur_length += 1
